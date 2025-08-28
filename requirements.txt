@@ -2,4 +2,5 @@ fastapi
 uvicorn
 python-multipart
 passlib
-jose
+sqlalchemy
+pyjwt
