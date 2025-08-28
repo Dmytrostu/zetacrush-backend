@@ -5,4 +5,3 @@ passlib
 sqlalchemy
 pyjwt
 python-dotenv
-logging
