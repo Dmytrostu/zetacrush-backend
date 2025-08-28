@@ -6,4 +6,3 @@ sqlalchemy
 pyjwt
 dotenv
 logging
-shutil
