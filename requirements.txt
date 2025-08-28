@@ -4,3 +4,6 @@ python-multipart
 passlib
 sqlalchemy
 pyjwt
+dotenv
+logging
+shutil

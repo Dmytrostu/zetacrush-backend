@@ -2,7 +2,6 @@ from sqlalchemy.orm import Session
 from crud.user_crud import get_user_by_username
 from crud.subscription_crud import get_subscription_by_user
 from fastapi import HTTPException
-from datetime import datetime
 import shutil
 import os
 import logging
