@@ -109,6 +109,22 @@ async def startup_event():
     logger.info(f"Debug mode: {'Enabled' if DEBUG else 'Disabled'}")
     logger.info(f"CORS configured for origins: {', '.join(CORS_ORIGINS)}")
     
+    # Initialize database
+    try:
+        from core.init_db import init_database, check_database_connection
+        
+        # First check if we can connect to the database
+        if not check_database_connection():
+            logger.error("Failed to connect to database. Application may not work correctly.")
+        
+        # Initialize database tables and data
+        if init_database():
+            logger.info("Database initialized successfully")
+        else:
+            logger.error("Failed to initialize database. Application may not work correctly.")
+    except Exception as e:
+        logger.error(f"Error during database initialization: {e}")
+    
     # Ensure uploads directory exists
     uploads_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "uploads")
     if not os.path.exists(uploads_dir):

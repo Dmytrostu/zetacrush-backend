@@ -2,7 +2,8 @@ fastapi
 uvicorn
 python-multipart
 passlib==1.7.4
-sqlalchemy
+sqlalchemy>=1.4.0
+sqlalchemy-utils>=0.40.0
 pyjwt
 python-dotenv
 bcrypt>=4.0.1
@@ -12,3 +13,4 @@ email-validator
 PyPDF2
 python-docx
 chardet
+psycopg2-binary>=2.9.9
