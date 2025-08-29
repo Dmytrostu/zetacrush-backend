@@ -2,8 +2,10 @@
 .env
 
 # Ignore all __pycache__ directories and .pyc files in any subdirectory
-**/__pycache__/*.pyc
 __pycache__/
+**/__pycache__/
+**/*.pyc
+*.pyc
 
 # Ignore all .pyc files (compiled Python files)
 **/*.pyc
