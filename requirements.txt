@@ -1,7 +1,14 @@
 fastapi
 uvicorn
 python-multipart
-passlib
+passlib==1.7.4
 sqlalchemy
 pyjwt
 python-dotenv
+bcrypt>=4.0.1
+psutil
+pydantic[email]
+email-validator
+PyPDF2
+python-docx
+chardet

@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CORS Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        button {
+            padding: 10px 15px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 0;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        pre {
+            background-color: #f5f5f5;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        .error {
+            color: red;
+        }
+        .success {
+            color: green;
+        }
+    </style>
+</head>
+<body>
+    <h1>Book Summarization API - CORS Test</h1>
+    <p>
+        This page helps test CORS (Cross-Origin Resource Sharing) configuration for 
+        the Book Summarization API. Click the buttons below to make requests to the API.
+    </p>
+
+    <h2>Test Endpoints</h2>
+    
+    <div>
+        <button id="testCorsBtn">Test CORS Configuration</button>
+        <button id="testApiBtn">Test API Health</button>
+        <button id="clearResultsBtn">Clear Results</button>
+    </div>
+    
+    <h3>Response:</h3>
+    <pre id="response">Click a button to make a request...</pre>
+    
+    <h2>Configuration</h2>
+    <p>
+        Edit the API base URL below to test different endpoints:
+    </p>
+    <input type="text" id="apiBaseUrl" value="http://localhost:8000/api/v1" style="width: 300px;">
+    
+    <script>
+        const responseElement = document.getElementById('response');
+        const apiBaseUrlInput = document.getElementById('apiBaseUrl');
+        
+        document.getElementById('testCorsBtn').addEventListener('click', async () => {
+            try {
+                responseElement.className = '';
+                responseElement.textContent = 'Making request...';
+                
+                const baseUrl = apiBaseUrlInput.value;
+                const response = await fetch(`${baseUrl}/cors-test`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    credentials: 'include'
+                });
+                
+                const data = await response.json();
+                
+                responseElement.className = 'success';
+                responseElement.textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                responseElement.className = 'error';
+                responseElement.textContent = `Error: ${error.message}\n\nThis is likely a CORS error. Check that your API server:\n1. Is running\n2. Has CORS properly configured\n3. Is allowing requests from this origin`;
+            }
+        });
+        
+        document.getElementById('testApiBtn').addEventListener('click', async () => {
+            try {
+                responseElement.className = '';
+                responseElement.textContent = 'Making request...';
+                
+                const baseUrl = apiBaseUrlInput.value;
+                const response = await fetch(`${baseUrl}/test`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+                
+                const data = await response.json();
+                
+                responseElement.className = 'success';
+                responseElement.textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                responseElement.className = 'error';
+                responseElement.textContent = `Error: ${error.message}`;
+            }
+        });
+        
+        document.getElementById('clearResultsBtn').addEventListener('click', () => {
+            responseElement.className = '';
+            responseElement.textContent = 'Results cleared.';
+        });
+    </script>
+</body>
+</html>
