@@ -33,9 +33,21 @@ TURSO_AUTH_TOKEN: str = os.getenv("TURSO_AUTH_TOKEN", "")
 API_V1_PREFIX: str = "/api/v1"
 
 # Upload Configuration
-UPLOAD_FOLDER: str = os.getenv("UPLOAD_FOLDER", "./uploads")
+# Determine if we're in a serverless environment (AWS Lambda, Vercel, etc.)
+IS_SERVERLESS: bool = os.environ.get("AWS_LAMBDA_FUNCTION_NAME") is not None or os.environ.get("VERCEL") is not None or os.environ.get("FUNCTION_TARGET") is not None
+
+# Use /tmp directory for serverless environments, otherwise use configured directory
+UPLOAD_FOLDER: str = "/tmp/uploads" if IS_SERVERLESS else os.getenv("UPLOAD_FOLDER", "./uploads")
+
+# In Vercel, we can only use /tmp for file operations
+IS_VERCEL: bool = os.environ.get("VERCEL") is not None
 ALLOWED_EXTENSIONS: List[str] = ["pdf", "txt", "doc", "docx"]
 MAX_FILE_SIZE: int = 10 * 1024 * 1024  # 10 MB
+
+# Google Drive Settings
+USE_CLOUD_STORAGE: bool = os.getenv("USE_CLOUD_STORAGE", "false").lower() == "true"
+GOOGLE_DRIVE_FOLDER_ID: str = os.getenv("GOOGLE_DRIVE_FOLDER_ID", "")
+GOOGLE_CREDENTIALS_FILE: str = os.getenv("GOOGLE_CREDENTIALS_FILE", "")
 
 # Security Configuration
 PASSWORD_BCRYPT_ROUNDS: int = 12

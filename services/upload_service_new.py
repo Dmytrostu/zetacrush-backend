@@ -14,6 +14,7 @@ from utils.book_analyzer import analyze_book_text
 import PyPDF2
 import io
 import tempfile
+from typing import Optional, Tuple
 
 # Import python-docx conditionally to avoid startup errors if not installed
 try:
@@ -26,11 +27,7 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-from typing import Optional, Tuple
-import tempfile
-from fastapi import UploadFile
-
-def prepare_storage_location(file: UploadFile) -> Tuple[str, str]:
+def prepare_storage_location(file: UploadFile) -> Tuple[str, str, str]:
     """
     Prepare appropriate storage location based on environment.
     
@@ -38,99 +35,52 @@ def prepare_storage_location(file: UploadFile) -> Tuple[str, str]:
         file (UploadFile): The uploaded file
         
     Returns:
-        Tuple[str, str]: (file_path, storage_type) where storage_type is 'local' or 'temporary'
+        Tuple[str, str, str]: (file_path, storage_type, book_id)
     """
     from core.config import UPLOAD_FOLDER, IS_SERVERLESS
-      # Generate a unique filename
+    
+    # Generate a unique identifier
     book_id = uuid.uuid4().hex
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     original_filename = getattr(file, 'filename', 'unknown')
     safe_filename = f"{timestamp}_{book_id}_{original_filename}"
     
     if IS_SERVERLESS:
-        # In serverless environment, use /tmp which is the only writable location
+        # In serverless environment, use /tmp
         uploads_dir = "/tmp/uploads"
         storage_type = "temporary"
-        logger.info(f"Using temporary storage directory: {uploads_dir}")
     else:
         # In regular environment, use configured uploads folder
         uploads_dir = UPLOAD_FOLDER
         storage_type = "local"
-        logger.info(f"Using local storage directory: {uploads_dir}")
     
     # Ensure directory exists
-    os.makedirs(uploads_dir, exist_ok=True)
+    try:
+        os.makedirs(uploads_dir, exist_ok=True)
+    except OSError as e:
+        logger.warning(f"Failed to create directory {uploads_dir}: {e}")
+        # Fallback to /tmp if we can't create the directory
+        uploads_dir = "/tmp/uploads"
+        os.makedirs(uploads_dir, exist_ok=True)
+        storage_type = "temporary"
     
     # Return the full path and storage type
-    return os.path.join(uploads_dir, safe_filename), storage_type
+    return os.path.join(uploads_dir, safe_filename), storage_type, book_id
 
 def save_to_cloud_storage(local_path: str, file_name: str) -> Optional[str]:
     """
-    Upload a file to Google Drive.
+    Upload a file to cloud storage (to be implemented in the future).
     
     Args:
         local_path (str): Path to local file
         file_name (str): Original file name
         
     Returns:
-        Optional[str]: Google Drive file ID if successful, None otherwise
+        Optional[str]: Cloud storage URL if successful, None otherwise
     """
-    from core.config import GOOGLE_DRIVE_FOLDER_ID, GOOGLE_CREDENTIALS_FILE, USE_CLOUD_STORAGE
-    import os
-    
-    if not USE_CLOUD_STORAGE:
-        logger.warning("Cloud storage is disabled. Set USE_CLOUD_STORAGE=true to enable.")
-        return None
-        
-    if not GOOGLE_DRIVE_FOLDER_ID or not os.path.exists(GOOGLE_CREDENTIALS_FILE):
-        logger.error(f"Google Drive configuration missing: GOOGLE_DRIVE_FOLDER_ID={GOOGLE_DRIVE_FOLDER_ID}, GOOGLE_CREDENTIALS_FILE exists: {os.path.exists(GOOGLE_CREDENTIALS_FILE)}")
-        return None
-    
-    try:
-        from googleapiclient.discovery import build
-        from googleapiclient.http import MediaFileUpload
-        from google.oauth2 import service_account
-        
-        # Generate a safe file name
-        safe_file_name = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex}_{file_name}"
-        
-        # Set up credentials
-        SCOPES = ['https://www.googleapis.com/auth/drive.file']
-        credentials = service_account.Credentials.from_service_account_file(
-            GOOGLE_CREDENTIALS_FILE, scopes=SCOPES)
-            
-        # Build the Drive service
-        drive_service = build('drive', 'v3', credentials=credentials)
-        
-        # Create file metadata
-        file_metadata = {
-            'name': safe_file_name,
-            'parents': [GOOGLE_DRIVE_FOLDER_ID]
-        }
-        
-        # Upload file
-        media = MediaFileUpload(
-            local_path,
-            resumable=True
-        )
-        
-        file = drive_service.files().create(
-            body=file_metadata,
-            media_body=media,
-            fields='id,webViewLink'
-        ).execute()
-        
-        file_id = file.get('id')
-        web_link = file.get('webViewLink', '')
-        
-        logger.info(f"File uploaded to Google Drive with ID: {file_id}")
-        
-        # Return the file ID and web link
-        return f"gdrive:{file_id}:{web_link}"
-    
-    except Exception as e:
-        logger.exception(f"Error uploading to Google Drive: {str(e)}")
-        return None
+    # TODO: Implement cloud storage upload (S3, Azure Blob, etc)
+    logger.warning("Cloud storage upload not implemented yet")
+    return None
 
 def extract_text_from_file(file_path: str, file_extension: str) -> str:
     """
@@ -228,30 +178,55 @@ def process_upload(db: Session, file: UploadFile, user_id: int) -> dict:
     if user.upload_count >= user.max_uploads:
         logger.error(f"Upload limit reached for user ID: {user_id}, count: {user.upload_count}, max: {user.max_uploads}")
         raise HTTPException(status_code=403, detail="Upload limit reached. Please upgrade your subscription.")
-      # Create unique identifier for the book
-    book_id = uuid.uuid4().hex
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    
+    # Get original filename and extension
     original_filename = getattr(file, 'filename', 'unknown')
-    safe_filename = f"{timestamp}_{book_id}_{original_filename}"
+    file_extension = original_filename.split('.')[-1].lower() if '.' in original_filename else ''
     
-    # Get storage location using our helper function
-    file_path, storage_type = prepare_storage_location(file)
+    # Prepare storage location with appropriate fallbacks for serverless environments
+    file_path, storage_type, book_id = prepare_storage_location(file)
+    logger.info(f"Storing file at {file_path} (storage type: {storage_type})")
+    
+    # Save file with error handling for read-only filesystems
     file_size = 0
-    
-    with open(file_path, "wb") as buffer:
-        # Get file size while copying
-        file_content = file.file.read()
-        file_size = len(file_content)
-        buffer.write(file_content)
-    
-    # Reset file position for potential future reads
-    file.file.seek(0)
+    try:
+        with open(file_path, "wb") as buffer:
+            file_content = file.file.read()
+            file_size = len(file_content)
+            buffer.write(file_content)
+        
+        # Reset file position for further processing
+        file.file.seek(0)
+        
+    except OSError as e:
+        if "Read-only file system" in str(e):
+            # Special handling for read-only filesystem errors (common in serverless)
+            logger.warning(f"Read-only filesystem detected. Using temporary file: {e}")
+            
+            # Use tempfile module for temporary storage
+            temp_handle, temp_path = tempfile.mkstemp(suffix=f"_{original_filename}")
+            try:
+                with os.fdopen(temp_handle, 'wb') as tmp:
+                    file.file.seek(0)
+                    file_content = file.file.read()
+                    file_size = len(file_content)
+                    tmp.write(file_content)
+                
+                file_path = temp_path
+                storage_type = "temporary"
+                file.file.seek(0)
+            except Exception as temp_err:
+                logger.error(f"Failed to write to temporary file: {temp_err}")
+                raise HTTPException(status_code=500, 
+                                   detail="Server storage error. Could not save uploaded file.")
+        else:
+            # Re-raise other errors
+            logger.error(f"File saving error: {e}")
+            raise HTTPException(status_code=500, 
+                              detail=f"Could not save uploaded file: {str(e)}")
     
     # Increment upload count
     user = increment_upload_count(db, user_id)
-    
-    # Get file extension to determine processing method
-    file_extension = original_filename.split('.')[-1].lower() if '.' in original_filename else ''
     
     try:
         # Extract text from the file
@@ -260,7 +235,7 @@ def process_upload(db: Session, file: UploadFile, user_id: int) -> dict:
         # Analyze the book text
         analysis_result = analyze_book_text(extracted_text)
         
-    # Create a formatted response
+        # Create a formatted response
         summary = {
             "id": book_id,
             "filename": original_filename,
@@ -280,28 +255,12 @@ def process_upload(db: Session, file: UploadFile, user_id: int) -> dict:
             }
         }
         
-        # In serverless environments, we can't rely on the local filesystem for persistent storage
-        # Just store the content analysis results, as the file itself may be deleted after execution
-        from core.config import IS_SERVERLESS
-          # If in serverless environment, we're using a temporary path
+        # Mark storage path as temporary for serverless environments
         stored_path = file_path
-        if IS_SERVERLESS:
-            # Upload to Google Cloud Storage for persistent storage
-            from core.config import USE_CLOUD_STORAGE
-            if USE_CLOUD_STORAGE:
-                cloud_path = save_to_cloud_storage(file_path, original_filename)
-                if cloud_path:
-                    stored_path = cloud_path
-                    logger.info(f"File uploaded to cloud storage: {cloud_path}")
-                else:
-                    # If cloud upload fails, mark it as temporary
-                    stored_path = f"TEMP:{file_path}"
-                    logger.warning("Cloud storage upload failed, using temporary storage")
-            else:
-                # Just store a note that this is temporary storage
-                stored_path = f"TEMP:{file_path}"
-                logger.info("Using temporary storage (cloud storage disabled)")
-            
+        if storage_type == "temporary":
+            # In production, you'd want to implement persistent storage (S3, etc.)
+            stored_path = f"TEMP:{file_path}"
+        
         # Save the book data to the database
         book = create_book(
             db=db,
@@ -315,15 +274,12 @@ def process_upload(db: Session, file: UploadFile, user_id: int) -> dict:
             synopsis=analysis_result["synopsis"],
             easter_egg=analysis_result["easter_egg"]
         )
-        print(book)
         
         logger.info(f"Successfully processed file: {original_filename} for user ID: {user_id}")
         return summary
         
     except Exception as e:
         logger.exception(f"Error processing file {original_filename}: {str(e)}")
-        # Even if processing fails, we've already incremented the upload count
-        # In a production system, we might want to roll back the counter if processing fails
         
         # Return a simplified response with error message
         return {

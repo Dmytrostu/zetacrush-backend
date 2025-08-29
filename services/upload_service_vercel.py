@@ -40,18 +40,19 @@ def prepare_storage_location(file: UploadFile) -> Tuple[str, str]:
     Returns:
         Tuple[str, str]: (file_path, storage_type) where storage_type is 'local' or 'temporary'
     """
-    from core.config import UPLOAD_FOLDER, IS_SERVERLESS
-      # Generate a unique filename
+    from core.config import UPLOAD_FOLDER, IS_SERVERLESS, IS_VERCEL
+    
+    # Generate a unique filename
     book_id = uuid.uuid4().hex
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     original_filename = getattr(file, 'filename', 'unknown')
     safe_filename = f"{timestamp}_{book_id}_{original_filename}"
     
     if IS_SERVERLESS:
-        # In serverless environment, use /tmp which is the only writable location
+        # In serverless environment (Vercel), use /tmp which is the only writable location
         uploads_dir = "/tmp/uploads"
         storage_type = "temporary"
-        logger.info(f"Using temporary storage directory: {uploads_dir}")
+        logger.info(f"Using temporary storage directory: {uploads_dir} (Vercel environment detected: {IS_VERCEL})")
     else:
         # In regular environment, use configured uploads folder
         uploads_dir = UPLOAD_FOLDER
@@ -228,7 +229,8 @@ def process_upload(db: Session, file: UploadFile, user_id: int) -> dict:
     if user.upload_count >= user.max_uploads:
         logger.error(f"Upload limit reached for user ID: {user_id}, count: {user.upload_count}, max: {user.max_uploads}")
         raise HTTPException(status_code=403, detail="Upload limit reached. Please upgrade your subscription.")
-      # Create unique identifier for the book
+    
+    # Create unique identifier for the book
     book_id = uuid.uuid4().hex
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     original_filename = getattr(file, 'filename', 'unknown')
@@ -260,7 +262,7 @@ def process_upload(db: Session, file: UploadFile, user_id: int) -> dict:
         # Analyze the book text
         analysis_result = analyze_book_text(extracted_text)
         
-    # Create a formatted response
+        # Create a formatted response
         summary = {
             "id": book_id,
             "filename": original_filename,
@@ -281,14 +283,17 @@ def process_upload(db: Session, file: UploadFile, user_id: int) -> dict:
         }
         
         # In serverless environments, we can't rely on the local filesystem for persistent storage
-        # Just store the content analysis results, as the file itself may be deleted after execution
-        from core.config import IS_SERVERLESS
-          # If in serverless environment, we're using a temporary path
+        from core.config import IS_SERVERLESS, IS_VERCEL
+        
+        # If in serverless environment, we're using a temporary path
         stored_path = file_path
         if IS_SERVERLESS:
-            # Upload to Google Cloud Storage for persistent storage
-            from core.config import USE_CLOUD_STORAGE
-            if USE_CLOUD_STORAGE:
+            # For Vercel, we'll just use the /tmp path but mark it as temporary
+            if IS_VERCEL:
+                stored_path = f"VERCEL_TMP:{file_path}"
+                logger.info(f"Using Vercel temporary storage: {stored_path}")
+            # For other environments, try cloud storage if enabled
+            elif USE_CLOUD_STORAGE:
                 cloud_path = save_to_cloud_storage(file_path, original_filename)
                 if cloud_path:
                     stored_path = cloud_path

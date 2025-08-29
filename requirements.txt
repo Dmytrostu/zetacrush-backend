@@ -15,3 +15,6 @@ python-docx
 chardet
 libsql_client
 psycopg2-binary>=2.9.9
+google-api-python-client
+google-auth-httplib2
+google-auth-oauthlib

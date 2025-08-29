@@ -10,10 +10,11 @@
         "src": "/(.*)",
         "dest": "main.py"
       }
-    ],
-  "env": {
+    ],  "env": {
       "ENVIRONMENT": "production",
-      "DEBUG": "false"
+      "DEBUG": "false",
+      "UPLOAD_FOLDER": "/tmp/uploads",
+      "IS_SERVERLESS": "true"
     },
     "crons": [
       {

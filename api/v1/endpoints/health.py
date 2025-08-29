@@ -23,6 +23,57 @@ def health_check():
     """
     return {"status": "ok", "message": "API is running"}
 
+@router.get("/env", summary="Environment check", description="Check environment variables and runtime environment")
+def environment_check():
+    """
+    Check the environment variables and runtime environment.
+    
+    Returns:
+        dict: Environment information.
+    """
+    import os
+    from core.config import IS_SERVERLESS, IS_VERCEL, UPLOAD_FOLDER
+    
+    # Get basic environment info without exposing sensitive variables
+    env_info = {
+        "ENVIRONMENT": os.getenv("ENVIRONMENT", "not set"),
+        "IS_SERVERLESS": IS_SERVERLESS,
+        "IS_VERCEL": IS_VERCEL,
+        "UPLOAD_FOLDER": UPLOAD_FOLDER,
+        "VERCEL_ENV": os.getenv("VERCEL_ENV", "not set") if IS_VERCEL else "not applicable",
+        "VERCEL_REGION": os.getenv("VERCEL_REGION", "not set") if IS_VERCEL else "not applicable",
+        "TMP_DIR_WRITABLE": os.access("/tmp", os.W_OK),
+    }
+    
+    # Check if tmp directory exists and is writable
+    tmp_dir = "/tmp/uploads"
+    tmp_test_file = "/tmp/uploads/test_write.txt"
+    
+    try:
+        if not os.path.exists(tmp_dir):
+            os.makedirs(tmp_dir, exist_ok=True)
+            env_info["tmp_dir_created"] = True
+        
+        # Test write to tmp directory
+        with open(tmp_test_file, "w") as f:
+            f.write("Test write")
+        
+        # Test read from tmp directory
+        with open(tmp_test_file, "r") as f:
+            content = f.read()
+        
+        # Clean up
+        os.remove(tmp_test_file)
+        
+        env_info["tmp_write_test"] = "success"
+        env_info["tmp_read_content"] = content
+    
+    except Exception as e:
+        env_info["tmp_write_test"] = "failed"
+        env_info["tmp_error"] = str(e)
+    
+    return env_info
+
 @router.get("/db", summary="Database health check", description="Check if the database connection is working")
 def db_health_check(db: Session = Depends(get_db)):
     """

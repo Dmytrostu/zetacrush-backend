@@ -1,8 +1,15 @@
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException
 from sqlalchemy.orm import Session
 from core.dependencies import get_db, get_current_user_id
-from services.upload_service import process_upload
 import logging
+import os
+
+# Use the Vercel-optimized upload service if we're in a Vercel environment
+if os.environ.get("VERCEL") is not None:
+    from services.upload_service_vercel import process_upload
+    print("Using Vercel-optimized upload service")
+else:
+    from services.upload_service import process_upload
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
