@@ -10,6 +10,15 @@
         "src": "/(.*)",
         "dest": "main.py"
       }
+    ],
+  "env": {
+      "ENVIRONMENT": "production",
+      "DEBUG": "false"
+    },
+    "crons": [
+      {
+        "path": "/api/v1/cron/cleanup-expired",
+        "schedule": "0 0 * * *"
+      }
     ]
-    
   }

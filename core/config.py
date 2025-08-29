@@ -26,7 +26,8 @@ JWT_ALGORITHM: str = os.getenv("JWT_ALGORITHM", "HS256")
 JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
 
 # Database Configuration
-DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./app.db")
+DATABASE_URL: str = os.getenv("DATABASE_URL", "postgresql://postgres:password@localhost:5432/zetacrush")
+TURSO_AUTH_TOKEN: str = os.getenv("TURSO_AUTH_TOKEN", "")
 
 # API Configuration
 API_V1_PREFIX: str = "/api/v1"
