@@ -14,7 +14,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 # Load common words to filter out from characters list
-COMMON_WORDS_PATH = os.path.join(os.path.dirname(__file__), "data", "common_words.txt")
+COMMON_WORDS_PATH = os.path.join(os.path.dirname(__file__), "data", "dict")
 
 # Interesting keywords for synopsis extraction
 INTERESTING_KEYWORDS = {
